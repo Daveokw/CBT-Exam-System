@@ -1,0 +1,6 @@
+streamlit>=1.56,<2
+pandas
+numpy
+fpdf
+werkzeug
+plotly

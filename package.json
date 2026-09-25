@@ -1,0 +1,16 @@
+{
+  "name": "cbt-exam-system-keep-alive",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser availability check for the CBT System Streamlit prototype",
+  "scripts": {
+    "keep-alive": "node keep_alive.js",
+    "test:keep-alive": "node --test tests/keep_alive.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright": "1.62.1"
+  }
+}
