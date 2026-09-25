@@ -11,7 +11,10 @@ import db
 from admin import auto_classify_topic, completed_test_results, process_smart_paste
 from ai import AIUnavailable
 from auth import DEMO_ADMIN_KEY, get_user_by_token, login_user, register_admin, register_user, verify_security_answer
-from student import answer_review_rows, ensure_challenge_start, pending_challenge_trigger, released_score_history, submit_exam
+from student import (
+    answer_review_rows, ensure_challenge_start, load_student_results,
+    pending_challenge_trigger, released_score_history, result_is_released, submit_exam,
+)
 
 
 class DemoDatabaseTests(unittest.TestCase):
@@ -182,13 +185,66 @@ class DemoDatabaseTests(unittest.TestCase):
 
     def test_released_score_history_excludes_unreleased_results(self):
         records = pd.DataFrame([
-            {"Paper": "Later", "score": 4, "total": 5, "date_taken": "2026-09-02", "release_option": "immediate"},
-            {"Paper": "Private", "score": 1, "total": 5, "date_taken": "2026-09-03", "release_option": "do_not_release"},
-            {"Paper": "Earlier", "score": 3, "total": 5, "date_taken": "2026-09-01", "release_option": "immediate"},
+            {"Paper": "Later", "score": 4, "total": 5, "date_taken": "2026-09-02", "release_option": "immediate", "max_students": 0, "completed_count": 1},
+            {"Paper": "Private", "score": 1, "total": 5, "date_taken": "2026-09-03", "release_option": "do_not_release", "max_students": 0, "completed_count": 1},
+            {"Paper": "Earlier", "score": 3, "total": 5, "date_taken": "2026-09-01", "release_option": "immediate", "max_students": 0, "completed_count": 1},
         ])
         history = released_score_history(records)
         self.assertEqual(history["Paper"].tolist(), ["Earlier", "Later"])
         self.assertEqual(history["percentage"].tolist(), [60.0, 80.0])
+
+    def test_after_limit_requires_distinct_completed_students(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(db, "DATABASE_PATH", Path(directory) / "demo.sqlite3"):
+                db.setup_database()
+                connection = db.get_db_connection()
+                cursor = connection.cursor()
+                for staff_id in ("1", "2"):
+                    cursor.execute(
+                        "INSERT INTO users (name, staff_id, password, role) VALUES ('Demo', %s, 'hash', 'student')",
+                        (staff_id,),
+                    )
+                cursor.execute(
+                    "INSERT INTO tests (title, duration, max_students, release_option) "
+                    "VALUES ('Capped', 15, 2, 'after_limit')"
+                )
+                test_id = cursor.lastrowid
+                cursor.execute(
+                    "INSERT INTO results (user_id, test_id, score, total, status) "
+                    "VALUES (1, %s, 3, 5, 'completed')",
+                    (test_id,),
+                )
+                cursor.execute(
+                    "INSERT INTO results (user_id, test_id, score, total, status) "
+                    "VALUES (1, %s, 4, 5, 'completed')",
+                    (test_id,),
+                )
+                cursor.execute(
+                    "INSERT INTO results (user_id, test_id, status) VALUES (2, %s, 'ongoing')",
+                    (test_id,),
+                )
+                connection.commit()
+                before = load_student_results(connection, 1)
+                self.assertEqual(before.iloc[0]["completed_count"], 1)
+                self.assertFalse(result_is_released(before.iloc[0]))
+                self.assertTrue(released_score_history(before).empty)
+
+                cursor.execute(
+                    "UPDATE results SET status='completed', score=5, total=5 "
+                    "WHERE user_id=2 AND test_id=%s",
+                    (test_id,),
+                )
+                connection.commit()
+                after = load_student_results(connection, 1)
+                self.assertEqual(after.iloc[0]["completed_count"], 2)
+                self.assertTrue(result_is_released(after.iloc[0]))
+                self.assertEqual(len(released_score_history(after)), 2)
+                connection.close()
+
+    def test_after_limit_without_a_limit_remains_unreleased(self):
+        self.assertFalse(result_is_released({
+            "release_option": "after_limit", "max_students": 0, "completed_count": 10,
+        }))
 
     def test_answer_review_marks_unanswered_questions(self):
         questions = [

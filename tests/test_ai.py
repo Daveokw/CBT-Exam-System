@@ -133,6 +133,20 @@ class AIHelperTests(unittest.TestCase):
                     "Revise algebra.",
                 )
 
+    def test_report_summary_includes_only_recent_released_percentages(self):
+        with patch("ai._request_json", return_value={"summary": "Keep revising."}) as ai_request:
+            summary = summarise_performance(
+                {"Algebra": {"correct": 2, "total": 5}},
+                [10, 20, 30, 40, 50, 60, 70, 80, 90],
+            )
+        self.assertEqual(summary, "Keep revising.")
+        self.assertEqual(ai_request.call_count, 1)
+        prompt = ai_request.call_args.args[0]
+        self.assertIn("[20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0]", prompt)
+        self.assertNotIn("10.0", prompt)
+        with self.assertRaises(ValueError):
+            summarise_performance({"Algebra": {"correct": 2, "total": 5}}, [101])
+
     def test_class_insight_uses_aggregate_figures(self):
         with patch.dict(os.environ, {"GEMINI_API_KEY": "demo-test-key"}):
             with patch("ai.request.urlopen", return_value=fake_response({"summary": "The class average was 60%."})):

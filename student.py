@@ -650,10 +650,22 @@ def clear_session():
     for tk in timer_keys:
         del st.session_state[tk]
 
+def result_is_released(result):
+    """Release capped tests once enough distinct students have completed them."""
+    if result["release_option"] == "immediate":
+        return True
+    return (
+        result["release_option"] == "after_limit"
+        and result["max_students"] > 0
+        and result["completed_count"] >= result["max_students"]
+    )
+
+
 def released_score_history(results):
-    """Return chronological, released percentage scores for local display only."""
+    """Return chronological percentages for results whose scores are released."""
+    release_mask = results.apply(result_is_released, axis=1)
     released = results.loc[
-        (results["release_option"] == "immediate") & (results["total"] > 0),
+        release_mask & (results["total"] > 0),
         ["Paper", "score", "total", "date_taken"],
     ].copy()
     if released.empty:
@@ -676,20 +688,32 @@ def answer_review_rows(questions, saved_answers):
     ]
 
 
+def load_student_results(conn, user_id):
+    """Load a student's completed results with current per-test completion counts."""
+    return pd.read_sql("""
+        SELECT r.id as result_id, t.id as test_id, t.title as Paper, t.show_correct_answers,
+               t.release_option, COALESCE(t.max_students, 0) as max_students,
+               COALESCE(completed.completed_count, 0) as completed_count,
+               r.score, r.total, r.status, r.date_taken, r.saved_answers
+        FROM results r
+        JOIN tests t ON r.test_id = t.id
+        LEFT JOIN (
+            SELECT test_id, COUNT(DISTINCT user_id) as completed_count
+            FROM results
+            WHERE status = 'completed'
+            GROUP BY test_id
+        ) completed ON completed.test_id = t.id
+        WHERE r.user_id = ? AND r.status = 'completed'
+        ORDER BY r.date_taken DESC
+    """, conn, params=(user_id,))
+
+
 def view_results():
     st.header("My Examination Report")
     conn = get_db_connection()
     user_id = st.session_state["user"]["id"]
 
-    # Fetch completed results, including release_option
-    df_results = pd.read_sql("""
-        SELECT r.id as result_id, t.id as test_id, t.title as Paper, t.show_correct_answers, t.release_option,
-               r.score, r.total, r.status, r.date_taken, r.saved_answers
-        FROM results r
-        JOIN tests t ON r.test_id = t.id
-        WHERE r.user_id = ? AND r.status = 'completed'
-        ORDER BY r.date_taken DESC
-    """, conn, params=(user_id,))
+    df_results = load_student_results(conn, user_id)
 
     if df_results.empty:
         st.info("You have not completed any examinations yet.")
@@ -710,16 +734,21 @@ def view_results():
 
     selected_row = df_results[df_results["result_id"] == selected_result_id].iloc[0]
 
-    if selected_row["release_option"] == "immediate":
+    if result_is_released(selected_row):
         percentage = round(selected_row["score"] / selected_row["total"] * 100, 1) if selected_row["total"] > 0 else 0
         st.success(f"**Score:** {selected_row['score']}/{selected_row['total']} ({percentage}%)")
     elif selected_row["release_option"] == "do_not_release":
         st.info("The score for this examination has not been released by the administrator.")
     else:
-        # after_limit
-        st.info("The score for this examination will be released after the limit.")
+        if selected_row["max_students"] > 0:
+            st.info(
+                "The score will be released when the student limit is reached "
+                f"({selected_row['completed_count']}/{selected_row['max_students']} students completed)."
+            )
+        else:
+            st.info("The administrator has not set a student limit, so this score cannot be released yet.")
 
-    if selected_row["release_option"] != "immediate":
+    if not result_is_released(selected_row):
         conn.close()
         return
 
@@ -852,14 +881,19 @@ def view_results():
     ai_advice = None
     if ai_available():
         advice_key = f"study_advice_{selected_result_id}"
-        if advice_key not in st.session_state:
+        recent_scores = tuple(history["percentage"].tail(8).tolist())
+        topic_signature = tuple(sorted((name, data["correct"], data["total"]) for name, data in topic_map.items()))
+        advice_signature = (topic_signature, recent_scores)
+        cached_advice = st.session_state.get(advice_key)
+        if not isinstance(cached_advice, tuple) or cached_advice[0] != advice_signature:
             try:
-                st.session_state[advice_key] = summarise_performance(topic_map)
+                advice = summarise_performance(topic_map, recent_scores)
             except (AIUnavailable, ValueError):
-                st.session_state[advice_key] = None
-        ai_advice = st.session_state[advice_key]
+                advice = None
+            st.session_state[advice_key] = (advice_signature, advice)
+        ai_advice = st.session_state[advice_key][1]
     if ai_advice:
         report_lines = report_lines[:summary_start] + [ai_advice]
     st.markdown("\n\n".join(report_lines))
     if ai_advice:
-        st.caption("The summary uses AI-generated advice from topic totals; check it against your scores.")
+        st.caption("The summary uses AI-generated advice from topic totals and released score history; check it against your scores.")

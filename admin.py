@@ -13,6 +13,8 @@ import hashlib
 import re
 import os
 import uuid
+import sqlite3
+from PIL import Image, ImageOps, UnidentifiedImageError
 from ai import (
     AIUnavailable,
     ai_available,
@@ -21,6 +23,50 @@ from ai import (
     format_questions,
     summarise_class_results,
 )
+
+IMAGE_SUFFIX_FORMATS = {
+    ".png": "PNG", ".jpg": "JPEG", ".jpeg": "JPEG",
+    ".gif": "GIF", ".webp": "WEBP", ".bmp": "BMP",
+    ".tif": "TIFF", ".tiff": "TIFF",
+}
+MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_IMAGE_PIXELS = 12_000_000
+MAX_STORED_IMAGE_BYTES = 10 * 1024 * 1024
+
+
+def prepare_question_image(image_bytes, filename):
+    """Validate and normalise an uploaded question image; discard animation and metadata."""
+    suffix = os.path.splitext(filename)[1].lower()
+    if suffix not in IMAGE_SUFFIX_FORMATS:
+        raise ValueError("Upload a PNG, JPEG, GIF, WebP, BMP or TIFF image.")
+    if not image_bytes or len(image_bytes) > MAX_IMAGE_UPLOAD_BYTES:
+        raise ValueError("The image must be non-empty and no larger than 5 MB.")
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(image_bytes)) as source:
+                if source.format != IMAGE_SUFFIX_FORMATS[suffix]:
+                    raise ValueError("The filename extension does not match the image format.")
+                if source.width * source.height > MAX_IMAGE_PIXELS:
+                    raise ValueError("The image is too large; use at most 12 million pixels.")
+                source.seek(0)
+                image = ImageOps.exif_transpose(source)
+                image.load()
+                has_alpha = "A" in image.getbands() or "transparency" in image.info
+                image = image.convert("RGBA" if has_alpha else "RGB")
+                image.thumbnail((2400, 2400), Image.Resampling.LANCZOS)
+                output = io.BytesIO()
+                output_suffix = ".png" if has_alpha or source.format in {"PNG", "GIF", "BMP", "TIFF"} else ".jpg"
+                if output_suffix == ".png":
+                    image.save(output, format="PNG", compress_level=3)
+                else:
+                    image.save(output, format="JPEG", quality=88)
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
+        raise ValueError("The selected file is not a valid or safe image.") from exc
+    prepared = output.getvalue()
+    if len(prepared) > MAX_STORED_IMAGE_BYTES:
+        raise ValueError("The processed image is too large; choose a smaller image.")
+    return prepared, output_suffix
 
 def admin_dashboard():
     st.title("Admin Dashboard")
@@ -784,7 +830,7 @@ def create_test():
         max_students = st.number_input("Max Students (0 = unlimited)", 0, value=0)
         release = st.selectbox("Release Option", ["immediate", "after_limit", "do_not_release"])
         if release == "after_limit":
-            st.caption("Automatic release after the student limit is not implemented; scores will remain hidden.")
+            st.caption("Scores are released once the set number of distinct students have completed this test.")
 
         c3, c4 = st.columns(2)
         show_correct = c3.checkbox("Show Correct Answers?")
@@ -796,6 +842,8 @@ def create_test():
                 st.error("Title is required.")
             elif duration < 1:
                 st.error("Duration must be at least one minute.")
+            elif release == "after_limit" and max_students < 1:
+                st.error("Set a student limit above zero to release scores after that limit is reached.")
             else:
                 conn = get_db_connection()
                 cur = conn.cursor()
@@ -973,7 +1021,9 @@ ANSWER: A""")
 
     with tab2:
         question = st.text_area("Question Text")
-        uploaded_image = st.file_uploader("Upload Diagram/Image (Optional)", type=["png", "jpg", "jpeg"])
+        uploaded_image = st.file_uploader(
+            "Upload Diagram/Image (Optional)", type=["png", "jpg", "jpeg", "gif", "webp", "bmp", "tif", "tiff"]
+        )
 
         col1, col2 = st.columns(2)
         with col1:
@@ -988,37 +1038,36 @@ ANSWER: A""")
         if st.button("Add Single Question"):
             if question and opt_a and opt_b and opt_c and opt_d:
                 image_path = None
+                image_bytes = None
                 if uploaded_image is not None:
-                    image_bytes = uploaded_image.getvalue()
-                    if len(image_bytes) > 5 * 1024 * 1024:
-                        st.error("The image must be smaller than 5 MB.")
+                    try:
+                        image_bytes, suffix = prepare_question_image(
+                            uploaded_image.getvalue(), uploaded_image.name
+                        )
+                    except ValueError as exc:
+                        st.error(str(exc))
                         conn.close()
                         return
-                    upload_dir = os.path.join(os.path.dirname(__file__), "uploads")
-                    os.makedirs(upload_dir, exist_ok=True)
-                    suffix = os.path.splitext(uploaded_image.name)[1].lower()
-                    if suffix not in {".png", ".jpg", ".jpeg"}:
-                        st.error("Please upload a PNG or JPEG image.")
-                        conn.close()
-                        return
-                    is_png = suffix == ".png" and image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
-                    is_jpeg = suffix in {".jpg", ".jpeg"} and image_bytes.startswith(b"\xff\xd8\xff")
-                    if not (is_png or is_jpeg):
-                        st.error("The selected file is not a valid PNG or JPEG image.")
-                        conn.close()
-                        return
-                    image_path = os.path.join(upload_dir, f"{uuid.uuid4().hex}{suffix}")
-                    with open(image_path, "wb") as f:
-                        f.write(image_bytes)
-
                 final_topic, final_subtopic = classify_topic_for_question(question, topic)
-
-                cursor.execute("""
-                    INSERT INTO questions (test_id, question, option_a, option_b, option_c, option_d, correct_option, topic, subtopic, image_path)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (selected_test_id, question, opt_a, opt_b, opt_c, opt_d, correct_opt, final_topic, final_subtopic, image_path))
-
-                conn.commit()
+                try:
+                    if image_bytes is not None:
+                        upload_dir = os.path.join(os.path.dirname(__file__), "uploads")
+                        os.makedirs(upload_dir, exist_ok=True)
+                        image_path = os.path.join(upload_dir, f"{uuid.uuid4().hex}{suffix}")
+                        with open(image_path, "wb") as image_file:
+                            image_file.write(image_bytes)
+                    cursor.execute("""
+                        INSERT INTO questions (test_id, question, option_a, option_b, option_c, option_d, correct_option, topic, subtopic, image_path)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (selected_test_id, question, opt_a, opt_b, opt_c, opt_d, correct_opt, final_topic, final_subtopic, image_path))
+                    conn.commit()
+                except (OSError, sqlite3.Error):
+                    conn.rollback()
+                    if image_path and os.path.isfile(image_path):
+                        os.remove(image_path)
+                    st.error("The question or its image could not be saved. Please try again.")
+                    conn.close()
+                    return
                 st.success(f"Question added successfully! Tagged under: **{final_topic}**")
             else:
                 st.error("Please fill all text fields.")

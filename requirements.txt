@@ -4,3 +4,4 @@ numpy
 fpdf
 werkzeug
 plotly
+Pillow>=12.3,<13
