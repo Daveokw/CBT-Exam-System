@@ -5,7 +5,7 @@ const FAILURE_SCREENSHOT = 'keep_alive_screenshot.png';
 const WAKE_CONTROL_PATTERN = /wake(?: up)?|back up|restart(?: this)? app|run(?: this)? app/i;
 
 function validatedTarget(rawValue) {
-  if (!rawValue) throw new Error('Set the STREAMLIT_APP_URL repository variable after deployment.');
+  if (!rawValue) throw new Error('Pass the public Streamlit app URL to the availability check.');
   const target = new URL(rawValue);
   if (target.protocol !== 'https:' || !/^[a-z0-9-]+\.streamlit\.app$/.test(target.hostname)) {
     throw new Error('The target must be an HTTPS Streamlit Community Cloud URL.');
@@ -59,14 +59,22 @@ async function waitForState(page, timeoutMs, acceptWakeControl) {
 }
 
 async function openApp(page, target) {
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const response = await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 90000 });
-    if (!response || response.status() < 400) return;
-    if (attempt === 2 || ![403, 429, 502, 503, 504].includes(response.status())) {
-      throw new Error(`The app returned HTTP ${response.status()}.`);
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    let failure;
+    let response;
+    try {
+      response = await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    } catch (error) {
+      failure = error;
     }
-    console.log(`The app returned HTTP ${response.status()}; retrying once in 15 seconds.`);
-    await page.waitForTimeout(15000);
+    if (!failure) {
+      if (!response || response.status() < 400) return;
+      failure = new Error(`The app returned HTTP ${response.status()}.`);
+      if (![403, 429, 502, 503, 504].includes(response.status())) throw failure;
+    }
+    if (attempt === 3) throw failure;
+    console.log(`${failure.message} Retrying in 10 seconds (${attempt}/3).`);
+    await page.waitForTimeout(10000);
   }
 }
 
