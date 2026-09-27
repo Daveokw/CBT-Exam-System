@@ -297,14 +297,14 @@ def take_exam():
 
     if is_sq_active:
         timer_html = f"""
-        <div style="background-color: #2e3b4e; color: #9ca3af; padding: 10px; border-radius: 8px; text-align: center; font-size: 22px; font-weight: bold; border: 2px dashed #9ca3af; font-family: monospace;">
+        <div style="background-color: #f3f6fb; color: #475569; padding: 10px; border-radius: 8px; text-align: center; font-size: 22px; font-weight: bold; border: 2px dashed #94a3b8; font-family: monospace;">
             <span>Time Remaining: {mins}m {secs}s (PAUSED)</span>
         </div>
         """
     else:
         # --- LIVE VISUAL TIMER FIX (JavaScript keeps it ticking) ---
         timer_html = f"""
-        <div style="background-color: #2e3b4e; color: #4ade80; padding: 10px; border-radius: 8px; text-align: center; font-size: 22px; font-weight: bold; border: 2px solid #4ade80; font-family: monospace;">
+        <div style="background-color: #f0fdf4; color: #166534; padding: 10px; border-radius: 8px; text-align: center; font-size: 22px; font-weight: bold; border: 2px solid #16a34a; font-family: monospace;">
             <span id="live-clock">Time Remaining: {mins}m {secs}s</span>
         </div>
         <script>
@@ -315,8 +315,8 @@ def take_exam():
                 if (timeLeft <= 0) {{
                     clearInterval(timer);
                     clockElement.innerHTML = "Time is up! Submitting...";
-                    clockElement.style.color = "#f87171";
-                    clockElement.style.borderColor = "#f87171";
+                    clockElement.style.color = "#b91c1c";
+                    clockElement.parentElement.style.borderColor = "#b91c1c";
                     // Force streamlit to refresh and trigger python's auto-submit
                     window.parent.location.reload();
                 }} else {{
@@ -389,7 +389,7 @@ def take_exam():
 
             # Visual JS Timer
             sq_timer_html = f"""
-            <div style="background-color: #2e3b4e; color: #facc15; padding: 10px; border-radius: 8px; text-align: center; font-size: 18px; font-weight: bold; border: 2px solid #facc15; font-family: monospace; margin-bottom: 10px;">
+            <div style="background-color: #fffbeb; color: #92400e; padding: 10px; border-radius: 8px; text-align: center; font-size: 18px; font-weight: bold; border: 2px solid #d97706; font-family: monospace; margin-bottom: 10px;">
                 <span id="sq-live-clock">Challenge Time Remaining: {int(time_remaining)}s</span>
             </div>
             <script>
@@ -400,8 +400,8 @@ def take_exam():
                     if (sqTimeLeft <= 0) {{
                         clearInterval(sqTimer);
                         sqClockElement.innerHTML = "Time is up! Submitting...";
-                        sqClockElement.style.color = "#f87171";
-                        sqClockElement.parentElement.style.borderColor = "#f87171";
+                        sqClockElement.style.color = "#b91c1c";
+                        sqClockElement.parentElement.style.borderColor = "#b91c1c";
                         window.parent.location.reload();
                     }} else {{
                         sqClockElement.innerHTML = "Challenge Time Remaining: " + sqTimeLeft + "s";

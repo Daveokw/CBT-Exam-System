@@ -10,6 +10,8 @@ A public, disposable computer-based testing prototype built with Streamlit and S
 
 The entry point is `app.py`. The database is created automatically at `data/demo.sqlite3`. You do not need to fill in `.env` for the basic demo.
 
+The interface uses a light theme. Navigation opens beside the content on desktop; on narrow screens, use the top-left arrow to open the sidebar when needed so the exam stays readable.
+
 To attach a diagram to a question, sign in as an administrator, open **Add Questions**, select a test, choose a PNG, JPEG, GIF, WebP, BMP, or TIFF in **Upload Diagram/Image (Optional)**, and save the question. Images are limited to 5 MB; animated GIFs use their first frame. The app creates `uploads/` automatically and displays the saved image with the question during an exam. Uploaded images are ignored by Git and, like the SQLite database, are temporary on Streamlit Community Cloud; they can disappear after a restart or redeployment. Keep original copies outside this demo.
 
 ## Deploy on Streamlit Community Cloud

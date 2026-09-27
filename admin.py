@@ -813,7 +813,7 @@ def student_search_analytics():
         def color_status(val):
             if not isinstance(val, str): return ''
             bg_color = 'rgba(40, 167, 69, 0.15)' if val == "Correct" else 'rgba(220, 53, 69, 0.15)'
-            text_color = '#4ade80' if val == "Correct" else '#f87171'
+            text_color = '#166534' if val == "Correct" else '#b91c1c'
             return f'background-color: {bg_color}; color: {text_color}; font-weight: bold;'
 
         st.dataframe(df_analysis.style.map(color_status, subset=['Status']), use_container_width=True, hide_index=True)

@@ -8,13 +8,15 @@ import admin
 import student
 
 # 1. Page Config
-st.set_page_config(page_title="CBT System", layout="wide")
+st.set_page_config(page_title="CBT System", layout="wide", initial_sidebar_state="auto")
 
 # 2. Setup DB (Runs once at startup)
 setup_database()
 
 if demo_mode_enabled():
     st.info("Public demo: use fictional names and answers only. Shared demo records may be reset.")
+
+st.caption("Navigation is in the left sidebar. Use the top-left arrow to show or hide it.")
 
 # Inject JS to disable browser autocomplete / password suggestions on all forms
 st.iframe("""
