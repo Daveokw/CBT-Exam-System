@@ -1,4 +1,4 @@
-# CBT Exam System
+# CBT System
 
 A lightweight computer-based testing prototype built with Python, Streamlit and SQLite, designed with institutions that have limited computing infrastructure in mind. Each visitor can create a private demo workspace, try the student and administrator flows, create tests, add questions, sit timed examinations, and view released results and topic-based reports. No database server or paid service is required for the core app.
 
@@ -22,7 +22,7 @@ This remains a public prototype, not a production isolation or access-control sy
 
 ### Optional availability check
 
-The [keep-alive workflow](.github/workflows/keep_alive.yml) checks the public app at `https://cbt-exam-system.streamlit.app/` every four hours and can also be started manually from **Actions**. If the app URL changes, set the GitHub repository variable `STREAMLIT_APP_URL` under **Settings → Secrets and variables → Actions → Variables** to override that default. The workflow opens the app in Chromium, requests wake-up if Streamlit shows a sleeping-app screen, checks that the CBT interface appears, and uploads a screenshot if verification fails. The URL is restricted to HTTPS `*.streamlit.app` hosts. No credentials are required for this public demo.
+The [keep-alive workflow](.github/workflows/keep_alive.yml) checks the public app at `https://cbt-system.streamlit.app/` every four hours and can also be started manually from **Actions**. If the app URL changes, set the GitHub repository variable `STREAMLIT_APP_URL` under **Settings → Secrets and variables → Actions → Variables** to override that default. The workflow opens the app in Chromium, requests wake-up if Streamlit shows a sleeping-app screen, checks that the CBT interface appears, and uploads a screenshot if verification fails. The URL is restricted to HTTPS `*.streamlit.app` hosts. No credentials are required for this public demo.
 
 This is a best-effort availability check, not a guarantee that the app will never sleep: Streamlit can still suspend or redeploy the app, and scheduled GitHub Actions can run late, be missed, or be disabled after repository inactivity. Check the workflow result and the live URL after deployment; visitors can wake a sleeping public app themselves.
 
