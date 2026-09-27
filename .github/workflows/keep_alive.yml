@@ -14,7 +14,6 @@ concurrency:
 
 jobs:
   keep-alive:
-    if: ${{ vars.STREAMLIT_APP_URL != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -35,7 +34,7 @@ jobs:
 
       - name: Verify the deployed application
         env:
-          STREAMLIT_APP_URL: ${{ vars.STREAMLIT_APP_URL }}
+          STREAMLIT_APP_URL: ${{ vars.STREAMLIT_APP_URL || 'https://cbt-exam-system.streamlit.app/' }}
         run: npm run keep-alive -- "$STREAMLIT_APP_URL"
 
       - name: Upload failure screenshot
