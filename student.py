@@ -527,14 +527,14 @@ def take_exam():
         answered_count = sum(str(question['id']) in st.session_state['answers'] for question in questions)
         st.caption(f"Current: {current_idx + 1} of {total_q} · Answered: {answered_count} of {total_q}")
         st.caption("Blue: current · outlined: answered · plain: unanswered")
-        palette_cols = st.columns(4, gap="small")
+        palette_cols = st.columns(2, gap="small")
         for i in range(total_q):
             q_id_str = str(questions[i]['id'])
             is_answered = q_id_str in st.session_state["answers"]
 
             label = str(i + 1)
             btn_type = "primary" if i == current_idx else ("secondary" if is_answered else "tertiary")
-            if palette_cols[i % 4].button(label, key=f"nav_q_{i}", type=btn_type, use_container_width=True):
+            if palette_cols[i % 2].button(label, key=f"nav_q_{i}", type=btn_type, use_container_width=True):
                 save_progress_to_db()
                 st.session_state["current_q_index"] = i
                 st.rerun()
