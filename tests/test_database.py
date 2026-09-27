@@ -2,6 +2,7 @@ import tempfile
 import unittest
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,10 +15,19 @@ from auth import DEMO_ADMIN_KEY, get_user_by_token, login_user, register_admin, 
 from student import (
     answer_review_rows, ensure_challenge_start, load_student_results,
     pending_challenge_trigger, released_score_history, result_is_released, submit_exam,
+    utc_now,
 )
 
 
 class DemoDatabaseTests(unittest.TestCase):
+    def test_exam_clock_matches_sqlite_utc_timestamps(self):
+        before = datetime.now(timezone.utc).replace(tzinfo=None)
+        current = utc_now()
+        after = datetime.now(timezone.utc).replace(tzinfo=None)
+        self.assertIsNone(current.tzinfo)
+        self.assertLessEqual(before, current)
+        self.assertLessEqual(current, after)
+
     def test_local_classifier_matches_whole_words(self):
         self.assertEqual(auto_classify_topic("meaningless"), "General Knowledge")
         self.assertEqual(auto_classify_topic("What is the powerhouse of the cell?"), "Biology")

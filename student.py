@@ -6,12 +6,17 @@ import pandas as pd
 import numpy as np
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 import plotly.express as px
 import os
 import random
 from ai import AIUnavailable, ai_available, summarise_performance
 from auth import verify_security_answer
+
+
+def utc_now():
+    """Return naive UTC to match SQLite's CURRENT_TIMESTAMP values."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def ensure_challenge_start(conn, result_id, user_id):
@@ -272,7 +277,7 @@ def take_exam():
         )
 
     # --- TIMER LOGIC (Python strictly enforces it) ---
-    now = datetime.now()
+    now = utc_now()
     if is_sq_active:
         now = st.session_state[timer_key] # Freeze exam time during challenge
 
@@ -362,9 +367,9 @@ def take_exam():
             # --- 60-Second Challenge Timer Logic ---
             timer_key = f"sq_timer_start_{pending_trigger}"
             if timer_key not in st.session_state:
-                st.session_state[timer_key] = datetime.now()
+                st.session_state[timer_key] = utc_now()
 
-            elapsed_seconds = (datetime.now() - st.session_state[timer_key]).total_seconds()
+            elapsed_seconds = (utc_now() - st.session_state[timer_key]).total_seconds()
             time_remaining = max(0, 60 - elapsed_seconds)
 
             if time_remaining <= 0:
@@ -447,7 +452,7 @@ def take_exam():
             if sq_submitted:
                 if verify_security_answer(chosen_sq['answer'], given_answer):
                     # Calculate time spent
-                    time_spent = (datetime.now() - st.session_state[timer_key]).total_seconds()
+                    time_spent = (utc_now() - st.session_state[timer_key]).total_seconds()
 
                     # Mark this specific trigger point as passed
                     sq_passed_triggers.add(pending_trigger)
