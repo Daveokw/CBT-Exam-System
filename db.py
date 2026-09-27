@@ -1,4 +1,4 @@
-"""SQLite storage for the disposable public CBT demonstration."""
+"""SQLite storage for isolated, disposable CBT demo workspaces."""
 
 import os
 import re
