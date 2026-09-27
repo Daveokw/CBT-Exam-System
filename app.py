@@ -1,20 +1,90 @@
 import streamlit as st
 import warnings
+from datetime import datetime, timezone
 # Suppress the pandas SQLAlchemy warning
 warnings.filterwarnings('ignore', category=UserWarning, module='pandas')
-from auth import DEMO_ADMIN_KEY, demo_mode_enabled, register_user, login_user, register_admin
-from db import setup_database, get_db_connection
+from auth import DEMO_ADMIN_KEY, clear_user_token, demo_mode_enabled, get_user_by_token, register_user, login_user, register_admin
+from db import (
+    activate_workspace,
+    cleanup_expired_workspaces,
+    clear_workspace,
+    create_workspace,
+    current_workspace_code,
+    get_db_connection,
+    setup_database,
+    workspace_expiry,
+)
 import admin
 import student
 
 # 1. Page Config
 st.set_page_config(page_title="CBT System", layout="wide", initial_sidebar_state="auto")
 
-# 2. Setup DB (Runs once at startup)
+# 2. Select a private demo before opening any user or exam records.
+clear_workspace()
+if demo_mode_enabled():
+    cleanup_expired_workspaces()
+    requested_workspace = st.query_params.get("workspace") or st.session_state.get("workspace_code")
+    if requested_workspace != st.session_state.get("workspace_code"):
+        st.session_state.clear()
+    if not requested_workspace or not activate_workspace(requested_workspace):
+        if requested_workspace:
+            st.session_state.clear()
+            st.query_params.clear()
+        st.title("CBT System")
+        if requested_workspace:
+            st.warning("That demo workspace has expired or is no longer available.")
+        st.info(
+            "Create a private seven-day demo, or enter a workspace code shared by your "
+            "administrator. Use fictional details only. Streamlit may reset local demo "
+            "files before seven days."
+        )
+        if st.button("Create private demo", type="primary"):
+            code, admin_key = create_workspace()
+            st.session_state["workspace_code"] = code
+            st.session_state["new_workspace_admin_key"] = admin_key
+            st.query_params["workspace"] = code
+            st.rerun()
+        with st.form("join_private_demo"):
+            entered_code = st.text_input("Join an existing demo with its workspace code")
+            join_submitted = st.form_submit_button("Join demo")
+        if join_submitted:
+            code = entered_code.strip().lower()
+            if activate_workspace(code):
+                st.session_state.clear()
+                st.session_state["workspace_code"] = code
+                st.query_params["workspace"] = code
+                st.rerun()
+            st.error("Workspace code not found or expired.")
+        st.stop()
+    st.session_state["workspace_code"] = requested_workspace
+
+# 3. Setup DB for the selected workspace.
 setup_database()
 
 if demo_mode_enabled():
-    st.info("Public demo: use fictional names and answers only. Shared demo records may be reset.")
+    st.info(
+        "Private demo: use fictional names and answers only. Records expire after seven "
+        "days and may be lost sooner if Streamlit resets local storage."
+    )
+    with st.sidebar:
+        st.caption("Private demo workspace")
+        st.code(current_workspace_code())
+        expiry = workspace_expiry()
+        if expiry:
+            st.caption(f"Expires {datetime.fromtimestamp(expiry, timezone.utc):%d %b %Y, %H:%M} UTC")
+        if st.button("Leave workspace"):
+            if st.session_state.get("user"):
+                clear_user_token(st.session_state["user"]["id"])
+            st.session_state.clear()
+            st.query_params.clear()
+            st.rerun()
+    if st.session_state.get("new_workspace_admin_key"):
+        st.warning(
+            "Save your private administrator key before closing this tab: "
+            f"`{st.session_state['new_workspace_admin_key']}`. "
+            "Share the workspace code with students, but keep this administrator key private."
+        )
 
 st.caption("Navigation is in the left sidebar. Use the top-left arrow to show or hide it.")
 
@@ -35,13 +105,11 @@ setInterval(disableAutocomplete, 500);
 </script>
 """, height=1)
 
-# 3. Session State Initialization
+# 4. Session State Initialization
 if "user" not in st.session_state:
     st.session_state["user"] = None
 if "role" not in st.session_state:
     st.session_state["role"] = None
-
-from auth import get_user_by_token, clear_user_token
 
 if not st.session_state.get("user"):
     token = st.query_params.get("session")
@@ -57,6 +125,8 @@ def logout():
     st.session_state["user"] = None
     st.session_state["role"] = None
     st.query_params.clear()
+    if current_workspace_code():
+        st.query_params["workspace"] = current_workspace_code()
     st.rerun()
 
 # --- MAIN APP LOGIC ---
@@ -92,13 +162,13 @@ if st.session_state["user"]:
 
 # ================= USER IS NOT LOGGED IN =================
 else:
-    st.title("CBT System")
-
     # Sidebar Menu
     menu = ["Login", "Register"]
     choice = st.sidebar.radio("Menu", menu)
 
-    col1, col2 = st.columns([1, 2]) # Centers the form visually
+    _, col2 = st.columns([1, 2])
+    with col2:
+        st.title("CBT System")
 
     # ------------------ LOGIN SECTION ------------------
     if choice == "Login":
@@ -151,7 +221,7 @@ else:
 
             # ---- ADMIN REGISTRATION (unchanged, single step) ----
             if reg_type == "Admin":
-                if demo_mode_enabled():
+                if demo_mode_enabled() and not current_workspace_code():
                     st.info(f"To try the administrator view, enter the demo key: {DEMO_ADMIN_KEY}")
                 with st.form("reg_form_Admin", clear_on_submit=True):
                     name = st.text_input("Full Name", key="reg_name_Admin", autocomplete="off")
@@ -175,6 +245,7 @@ else:
                     else:
                         try:
                             register_admin(name, identifier, password, admin_key)
+                            st.session_state.pop("new_workspace_admin_key", None)
                             st.success("Admin Account Created! Please switch to Login.")
                         except Exception as e:
                             st.error(f"Error: {e}")

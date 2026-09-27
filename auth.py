@@ -3,7 +3,7 @@ import os
 import secrets
 
 from werkzeug.security import generate_password_hash, check_password_hash
-from db import get_db_connection
+from db import current_workspace_code, get_db_connection, workspace_admin_key_hash
 
 DEMO_ADMIN_KEY = "DEMO-ADMIN"
 
@@ -49,8 +49,13 @@ def register_user(name, matric_no, password, department, security_answers=None):
     conn.close()
 
 def register_admin(name, staff_id, password, secret_key):
-    admin_key = admin_registration_key()
-    if not admin_key or not secrets.compare_digest(secret_key, admin_key):
+    if current_workspace_code():
+        key_hash = workspace_admin_key_hash()
+        valid_key = bool(key_hash and check_password_hash(key_hash, secret_key))
+    else:
+        admin_key = admin_registration_key()
+        valid_key = bool(admin_key and secrets.compare_digest(secret_key, admin_key))
+    if not valid_key:
         raise ValueError("Invalid admin secret key!")
 
     conn = get_db_connection()

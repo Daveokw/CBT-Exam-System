@@ -1,24 +1,24 @@
 # CBT Exam System
 
-A public, disposable computer-based testing prototype built with Streamlit and SQLite. Visitors can try the student and administrator flows, create tests, add questions, sit timed examinations, and view released results and topic-based reports. No database server or paid service is required for the core app.
+A lightweight computer-based testing prototype built with Python, Streamlit and SQLite, designed with institutions that have limited computing infrastructure in mind. Each visitor can create a private demo workspace, try the student and administrator flows, create tests, add questions, sit timed examinations, and view released results and topic-based reports. No database server or paid service is required for the core app.
 
 ## Run locally
 
 1. Use Python 3.12 and install `requirements.txt` in a virtual environment.
 2. Run `streamlit run app.py` from this folder.
-3. Select **Register** to create a demo account. The administrator registration screen displays the demo key, `DEMO-ADMIN`, so visitors can try that role too.
+3. Select **Create private demo** and save the workspace code and administrator key shown on screen. Register an administrator with that key, then share only the workspace code with people joining as students. Returning visitors can enter the code under **Join demo**.
 
-The entry point is `app.py`. The database is created automatically at `data/demo.sqlite3`. You do not need to fill in `.env` for the basic demo.
+The entry point is `app.py`. Each private demo gets a separate SQLite file under `data/workspaces/`. Existing records in the former shared `data/demo.sqlite3` file are left untouched but are not shown in new public demo workspaces. You do not need to fill in `.env` for the basic demo.
 
 The interface uses a light theme. Navigation opens beside the content on desktop; on narrow screens, use the top-left arrow to open the sidebar when needed so the exam stays readable.
 
-To attach a diagram to a question, sign in as an administrator, open **Add Questions**, select a test, choose a PNG, JPEG, GIF, WebP, BMP, or TIFF in **Upload Diagram/Image (Optional)**, and save the question. Images are limited to 5 MB; animated GIFs use their first frame. The app creates `uploads/` automatically and displays the saved image with the question during an exam. Uploaded images are ignored by Git and, like the SQLite database, are temporary on Streamlit Community Cloud; they can disappear after a restart or redeployment. Keep original copies outside this demo.
+To attach a diagram to a question, sign in as an administrator, open **Add Questions**, select a test, choose a PNG, JPEG, GIF, WebP, BMP, or TIFF in **Upload Diagram/Image (Optional)**, and save the question. Images are limited to 5 MB; animated GIFs use their first frame. The app creates a separate folder under `uploads/` for each workspace and displays saved images during its exams. Uploaded images are ignored by Git and, like the SQLite database, are temporary on Streamlit Community Cloud; they can disappear after a restart or redeployment. Keep original copies outside this demo.
 
 ## Deploy on Streamlit Community Cloud
 
-Point the app at `app.py` in this repository. No MySQL server, database credentials, or AI key is needed for basic use. The SQLite database and uploaded question images are stored on the app's local filesystem and **may disappear when Streamlit restarts or rebuilds the app**. They are ignored by Git. This is intentional for a throwaway demonstration, not suitable for a real school's records.
+Point the app at `app.py` in this repository. No MySQL server, database credentials, or AI key is needed for basic use. A new workspace receives a random join code and a separate administrator key. Its accounts, tests, results and images are isolated from other workspaces. Keep the administrator key private; share only the workspace code with students. A workspace becomes inaccessible seven days after creation, and the app removes expired files when it next runs. The SQLite files and uploaded images live on Streamlit's local filesystem and **may disappear before seven days if Streamlit restarts or rebuilds the app**. They are ignored by Git. Seven days is a maximum lifetime, not guaranteed retention.
 
-The demo key is deliberately public. Any visitor can create an administrator account, change demo content, and potentially inspect other demo records. Use **fictional names, IDs, passwords, and security-question answers only**. Do not use this deployment for real examinations or student data.
+This remains a public prototype, not a production isolation or access-control system. Use **fictional names, IDs, passwords, and security-question answers only**. Do not use this deployment for real examinations or student data. Do not share a signed-in browser URL: it contains a session token as well as the workspace code.
 
 ### Optional availability check
 

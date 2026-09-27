@@ -1,7 +1,7 @@
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning, module='pandas')
 import streamlit as st
-from db import get_db_connection
+from db import get_db_connection, question_upload_directory
 import pandas as pd
 import numpy as np
 from fpdf import FPDF
@@ -1051,8 +1051,8 @@ ANSWER: A""")
                 final_topic, final_subtopic = classify_topic_for_question(question, topic)
                 try:
                     if image_bytes is not None:
-                        upload_dir = os.path.join(os.path.dirname(__file__), "uploads")
-                        os.makedirs(upload_dir, exist_ok=True)
+                        upload_dir = question_upload_directory()
+                        upload_dir.mkdir(parents=True, exist_ok=True)
                         image_path = os.path.join(upload_dir, f"{uuid.uuid4().hex}{suffix}")
                         with open(image_path, "wb") as image_file:
                             image_file.write(image_bytes)
