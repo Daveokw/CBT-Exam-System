@@ -10,6 +10,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import io
 import hashlib
+import logging
 import re
 import os
 import uuid
@@ -1058,10 +1059,11 @@ ANSWER: A""")
                             image_file.write(image_bytes)
                     cursor.execute("""
                         INSERT INTO questions (test_id, question, option_a, option_b, option_c, option_d, correct_option, topic, subtopic, image_path)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (selected_test_id, question, opt_a, opt_b, opt_c, opt_d, correct_opt, final_topic, final_subtopic, image_path))
                     conn.commit()
                 except (OSError, sqlite3.Error):
+                    logging.exception("A question could not be saved")
                     conn.rollback()
                     if image_path and os.path.isfile(image_path):
                         os.remove(image_path)

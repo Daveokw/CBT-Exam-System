@@ -43,6 +43,45 @@ class DemoAppTests(unittest.TestCase):
                 self.assertFalse(app.exception)
                 self.assertTrue(any(item.value == "Admin Dashboard" for item in app.title))
 
+    def test_admin_can_add_question_to_private_demo(self):
+        app_path = Path(__file__).resolve().parents[1] / "app.py"
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(db, "DATABASE_PATH", Path(directory) / "demo.sqlite3"):
+                code, admin_key = db.create_workspace()
+                register_admin("Demo Admin", "101", "password", admin_key)
+                user = login_user("101", "password", "admin")
+                with closing(db.get_db_connection()) as connection:
+                    with connection:
+                        connection.execute(
+                            "INSERT INTO tests (title, duration, created_by, visible) "
+                            "VALUES ('Palette verification', 15, ?, 1)",
+                            (user["id"],),
+                        )
+                db.clear_workspace()
+                app = AppTest.from_file(str(app_path))
+                app.session_state["workspace_code"] = code
+                app.session_state["user"] = user
+                app.session_state["role"] = "admin"
+                app.run(timeout=25)
+                next(item for item in app.sidebar.radio if item.label == "Navigation").set_value(
+                    "Add Questions"
+                ).run(timeout=25)
+                next(item for item in app.text_input if item.label.startswith("Topic / Subject")).set_value(
+                    "Arithmetic"
+                )
+                next(item for item in app.text_area if item.label == "Question Text").set_value(
+                    "Palette sample question?"
+                )
+                for letter in "ABCD":
+                    next(item for item in app.text_input if item.label == f"Option {letter}").set_value(letter)
+                next(item for item in app.button if item.label == "Add Single Question").click().run(timeout=25)
+                self.assertFalse(app.exception)
+                self.assertFalse(app.error, [item.value for item in app.error])
+                self.assertTrue(db.activate_workspace(code))
+                with closing(db.get_db_connection()) as connection:
+                    self.assertEqual(connection.execute("SELECT COUNT(*) FROM questions").fetchone()[0], 1)
+                db.clear_workspace()
+
     def test_question_palette_shows_first_question_and_navigates(self):
         app_path = Path(__file__).resolve().parents[1] / "app.py"
         with tempfile.TemporaryDirectory() as directory:
