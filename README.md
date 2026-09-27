@@ -16,7 +16,9 @@ To attach a diagram to a question, sign in as an administrator, open **Add Quest
 
 ## Deploy on Streamlit Community Cloud
 
-Point the app at `app.py` in this repository. No MySQL server, database credentials, or AI key is needed for basic use. A new workspace receives a random join code and a separate administrator key. Its accounts, tests, results and images are isolated from other workspaces. Keep the administrator key private; share only the workspace code with students. A workspace becomes inaccessible seven days after creation, and the app removes expired files when it next runs. The SQLite files and uploaded images live on Streamlit's local filesystem and **may disappear before seven days if Streamlit restarts or rebuilds the app**. They are ignored by Git. Seven days is a maximum lifetime, not guaranteed retention.
+Deploy `app.py` from this repository or a fork on Streamlit Community Cloud. Make the deployment public before sharing it or using the availability check.
+
+No MySQL server, database credentials, or AI key is needed for basic use. A new workspace receives a random join code and a separate administrator key. Its accounts, tests, results and images are isolated from other workspaces. Keep the administrator key private; share only the workspace code with students. A workspace becomes inaccessible seven days after creation, and the app removes expired files when it next runs. The SQLite files and uploaded images live on Streamlit's local filesystem and **may disappear before seven days if Streamlit restarts or rebuilds the app**. They are ignored by Git. Seven days is a maximum lifetime, not guaranteed retention.
 
 This remains a public prototype, not a production isolation or access-control system. Use **fictional names, IDs, passwords, and security-question answers only**. Do not use this deployment for real examinations or student data. Do not share a signed-in browser URL: it contains a session token as well as the workspace code.
 

@@ -9,7 +9,7 @@ test('accepts only a public Streamlit HTTPS app URL', () => {
     'https://cbt-system.streamlit.app.evil.example/',
     'https://127.0.0.1/',
     'https://cbt-system.streamlit.app/?token=secret',
-    'https://user:password@cbt-exam-system.streamlit.app/',
+    'https://user:password@cbt-system.streamlit.app/',
   ]) {
     assert.throws(() => validatedTarget(value));
   }
