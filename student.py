@@ -48,9 +48,9 @@ def student_dashboard():
         st.session_state["current_student_page"] = "Take Exam"
 
     menu = ["Take Exam", "View Results"]
-    current_idx = menu.index(st.session_state["current_student_page"]) if st.session_state["current_student_page"] in menu else 0
-    choice = st.sidebar.radio("Student Menu", menu, index=current_idx)
-    st.session_state["current_student_page"] = choice
+    if st.session_state["current_student_page"] not in menu:
+        st.session_state["current_student_page"] = "Take Exam"
+    choice = st.sidebar.radio("Student Menu", menu, key="current_student_page")
 
     # Show "Exam Submitted" screen (overrides main content)
     if st.session_state.get("exam_just_submitted"):
@@ -519,26 +519,24 @@ def take_exam():
         st.markdown("---")
         st.subheader("Question Palette")
 
-        palette_cols = st.columns(5)
+        answered_count = sum(str(question['id']) in st.session_state['answers'] for question in questions)
+        st.caption(f"Current: {current_idx + 1} of {total_q} · Answered: {answered_count} of {total_q}")
+        st.caption("Blue: current · outlined: answered · plain: unanswered")
+        palette_cols = st.columns(4, gap="small")
         for i in range(total_q):
             q_id_str = str(questions[i]['id'])
             is_answered = q_id_str in st.session_state["answers"]
 
-            if i == current_idx:
-                label = f"► {i+1}"
-            elif is_answered:
-                label = f"✓ {i+1}"
-            else:
-                label = f"{i+1}"
-
+            label = str(i + 1)
             btn_type = "primary" if i == current_idx else ("secondary" if is_answered else "tertiary")
-            if palette_cols[i % 5].button(label, key=f"nav_q_{i}", type=btn_type):
+            if palette_cols[i % 4].button(label, key=f"nav_q_{i}", type=btn_type, use_container_width=True):
                 save_progress_to_db()
                 st.session_state["current_q_index"] = i
                 st.rerun()
 
     with st.container(border=True):
         st.subheader(f"Question {current_idx + 1} of {total_q}")
+        st.divider()
         st.markdown(f"### {q['question']}")
 
         if q.get('image_path') and os.path.exists(q['image_path']):
