@@ -34,7 +34,7 @@ jobs:
 
       - name: Verify the deployed application
         env:
-          STREAMLIT_APP_URL: ${{ vars.STREAMLIT_APP_URL || 'https://cbt-exam-system.streamlit.app/' }}
+          STREAMLIT_APP_URL: ${{ vars.STREAMLIT_APP_URL || 'https://cbt-system.streamlit.app/' }}
         run: npm run keep-alive -- "$STREAMLIT_APP_URL"
 
       - name: Upload failure screenshot
